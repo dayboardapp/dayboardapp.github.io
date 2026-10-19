@@ -1,0 +1,1015 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Day Board puts your class schedule, Google Classroom, tests and calendar on one calm screen, for iPhone and Mac.">
+<meta property="og:title" content="Day Board">
+<meta property="og:description" content="Your whole school day, on one screen.">
+<meta name="theme-color" content="#07080a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='26' fill='%23111'/%3E%3Cpath d='M36 34h48M36 86h30' stroke='%235f5f5f' stroke-width='10' stroke-linecap='round'/%3E%3Cpath d='M36 60h56' stroke='white' stroke-width='10' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='60' r='9' fill='white'/%3E%3C/svg%3E">
+<title>Day Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Serif:ital@0;1&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+@property --glow { syntax: '<color>'; inherits: true; initial-value: transparent; }
+/* Layout: one continuous story. Text scrolls on the left; a single phone stays on screen on the
+   right and changes to match. The app's "now line" and five class colors carry the whole page. */
+:root {
+  /* One committed dark look, like a race-night broadcast: near-black, class colors that glow. */
+  --bg: #07080a;
+  --ink: #f2f3f5;
+  --muted: #8b919b;
+  --line: #24272d;
+  --accent: #3d9bff;
+  --neon: rgba(61,155,255,.55);
+  --c-history: #ff453a;
+  --c-math: #0a84ff;
+  --c-science: #000000;
+  --c-english: #30d158;
+  --c-french: #ffd60a;
+  --c-other: #8e8e93;
+  --phone: #000;
+  --card: #1c1d21;
+  --pink: #f4f5f7;
+  --pmuted: #8d929b;
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Atkinson Hyperlegible", -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --sys: -apple-system, "SF Pro Text", "Atkinson Hyperlegible", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.55; overflow-x: hidden; }
+h1, h2 { font-family: var(--display); line-height: 1.06; text-wrap: balance; margin: 0; letter-spacing: -.015em; }
+p { margin: 0; max-width: 56ch; }
+
+/* Drifting class-color bars behind everything */
+.drift { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.drift i { position: absolute; display: block; height: 8px; border-radius: 4px; opacity: .22; }
+@media (prefers-reduced-motion: no-preference) {
+  .drift i { animation: drift var(--d, 30s) linear infinite; animation-delay: var(--delay, 0s); }
+}
+@keyframes drift {
+  from { transform: translate3d(-10vw, 0, 0); }
+  to { transform: translate3d(110vw, var(--dy, -6vh), 0); }
+}
+
+/* The now line pinned to the top: fills as you scroll */
+.progress { position: fixed; left: 0; right: 0; top: 0; z-index: 20; height: calc(4px + env(safe-area-inset-top, 0px)); pointer-events: none; }
+.progress .fill { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p, 0) * 100%); background: var(--accent); }
+.progress .dot { position: absolute; bottom: -4px; left: calc(var(--p, 0) * 100% - 6px); width: 11px; height: 11px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--bg); }
+
+.page { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 24px; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 19px; }
+.icon { width: 30px; height: 30px; border-radius: 8px; background: #111; display: grid; place-items: center; flex: none; }
+.icon svg { width: 20px; height: 20px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+
+/* Story: text column + sticky phone column */
+.story { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 64px; }
+.steps { display: grid; }
+.step { min-height: 82vh; display: flex; flex-direction: column; justify-content: center; gap: 18px; padding-block: 40px; }
+.step:first-child { min-height: 78vh; justify-content: flex-start; padding-top: 7vh; }
+.step:last-child { min-height: 70vh; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+.kicker .n { color: var(--accent); }
+.step h1 { font-size: clamp(44px, 6.6vw, 82px); font-weight: 700; }
+.step h1 em { font-style: normal; color: var(--accent); }
+.step h2 { font-size: clamp(32px, 4.2vw, 50px); font-weight: 700; }
+.step p { color: var(--muted); font-size: 18.5px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.facts b { color: var(--ink); }
+.nowline { display: flex; align-items: center; height: 14px; max-width: 420px; }
+.nowline::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); flex: none; }
+.nowline::after { content: ""; flex: 1; height: 4px; border-radius: 2px; background: var(--ink); margin-left: -2px; }
+.colors { display: flex; gap: 6px; }
+.colors span { width: 30px; height: 6px; border-radius: 3px; }
+
+.stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 6vh); height: fit-content; padding-block: 20px; }
+
+/* Phone */
+.phone { position: relative; width: 330px; max-width: 100%; height: 660px; margin-inline: auto; background: var(--phone); color: var(--pink);
+  border-radius: 48px; padding: 14px 12px; box-shadow: 0 0 0 2px #2c2e33, 0 40px 80px -30px rgba(0,0,0,.5);
+  font-family: var(--sys); font-size: 13px; line-height: 1.3; overflow: hidden; }
+.notch { position: relative; z-index: 3; width: 96px; height: 26px; border-radius: 14px; background: #000; margin: 0 auto 8px; box-shadow: 0 0 0 1px #1a1a1a; }
+.screen { position: absolute; inset: 48px 12px 14px; display: flex; flex-direction: column; gap: 9px;
+  opacity: 0; transform: translateY(16px) scale(.985); transition: opacity .5s ease, transform .5s ease; pointer-events: none; }
+.screen.on { opacity: 1; transform: none; }
+.ptitle { font-weight: 700; font-size: 21px; padding: 0 6px 2px; }
+.plabel { font-size: 12px; color: var(--pmuted); padding: 4px 6px 0; display: flex; justify-content: space-between; }
+.pcard { background: var(--card); border-radius: 16px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: .5px solid #2f3136; transition: opacity .4s ease, background-color .4s ease; }
+.row:last-child { border-bottom: 0; }
+.bar { width: 4px; height: 26px; border-radius: 2px; flex: none; }
+.bar.tall { height: 40px; }
+.b-history { background: var(--c-history); } .b-math { background: var(--c-math); } .b-science { background: var(--c-science); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
+.b-english { background: var(--c-english); } .b-french { background: var(--c-french); } .b-other { background: var(--c-other); }
+.time { width: 40px; flex: none; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.time b { display: block; font-size: 12px; } .time small { display: block; font-size: 10px; color: var(--pmuted); }
+.grow { flex: 1; min-width: 0; }
+.clip { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { color: var(--pmuted); font-size: 11px; }
+.end { margin-left: auto; font-size: 11px; color: var(--pmuted); white-space: nowrap; }
+.red { color: #ff453a !important; }
+.pill { display: inline-block; background: #0a84ff; color: #fff; font-size: 9.5px; font-weight: 800; letter-spacing: .06em; padding: 2px 7px; border-radius: 99px; }
+.row.past { opacity: .38; }
+.row.now { background: rgba(10,132,255,.15); }
+.row .nowtag { margin-left: auto; font-size: 10.5px; font-weight: 700; color: #0a84ff; opacity: 0; transition: opacity .3s; }
+.row.now .nowtag { opacity: 1; }
+.next { padding: 12px 14px; display: grid; gap: 7px; }
+.next .line { display: flex; align-items: center; gap: 10px; }
+.next .cls { font-weight: 700; font-size: 20px; }
+.next .when { color: #0a84ff; font-weight: 600; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.next .week { margin-left: auto; color: #0a84ff; font-size: 12.5px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); text-align: center; padding: 10px 0; }
+.stats b { display: block; font-size: 22px; font-weight: 600; transition: transform .25s ease; }
+.stats b.bump { transform: scale(1.25); }
+.stats small { color: var(--pmuted); font-size: 10.5px; }
+.tabbar { margin-top: auto; display: flex; justify-content: space-around; padding: 9px 4px; border-radius: 99px; background: #1a1b1f; font-size: 10px; color: var(--pmuted); }
+.tabbar .on { color: #0a84ff; }
+
+/* Notification banner that drops in over the Today screen */
+.banner { position: absolute; z-index: 2; left: 14px; right: 14px; top: 46px; display: flex; gap: 10px; align-items: center;
+  background: rgba(44,45,50,.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 18px; padding: 10px 12px;
+  transform: translateY(-140%); opacity: 0; transition: transform .45s cubic-bezier(.2,.9,.3,1.1), opacity .3s; }
+.banner.show { transform: none; opacity: 1; }
+.banner .ic { width: 30px; height: 30px; border-radius: 8px; background: #111; display: grid; place-items: center; flex: none; }
+.banner .ic svg { width: 19px; height: 19px; }
+.banner b { display: block; font-size: 12.5px; }
+.banner span { font-size: 11.5px; color: #c9ccd2; }
+
+.date { width: 40px; flex: none; text-align: center; }
+.date small { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .05em; }
+.date b { display: block; font-size: 18px; }
+.feed .row { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .feed .row.fresh { animation: slidein .5s ease both; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+}
+.f1pill { background: #e10600; }
+.team { width: 4px; height: 28px; border-radius: 2px; flex: none; }
+.count { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; color: #ff453a; letter-spacing: .02em; }
+
+/* Home screen with widgets */
+.home { position: absolute; inset: 0; background: radial-gradient(120% 80% at 30% 10%, #2a3140 0%, #101216 70%); border-radius: 48px; }
+.home .grid { position: absolute; inset: 64px 18px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-content: start; }
+.w { background: #111214; border-radius: 22px; padding: 12px; aspect-ratio: 1; display: flex; flex-direction: column; box-shadow: 0 10px 24px -14px rgba(0,0,0,.6); }
+.w.wide { grid-column: 1 / -1; aspect-ratio: auto; height: 130px; }
+.w .lbl { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: #0a84ff; }
+.w .t { font-weight: 700; font-size: 15px; margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+.w .m { color: var(--pmuted); margin-top: 2px; font-size: 12px; }
+.w .sp { flex: 1; }
+.w .miss { color: #ff453a; font-weight: 700; font-size: 10.5px; }
+.flip { transition: opacity .35s ease; }
+.flip.out { opacity: 0; }
+.apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; grid-column: 1 / -1; margin-top: 4px; }
+.apps i { aspect-ratio: 1; border-radius: 14px; background: #2a2d33; display: block; }
+.apps i.db { background: #111 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><path d='M36 34h48M36 86h30' stroke='%235f5f5f' stroke-width='10' stroke-linecap='round'/><path d='M36 60h56' stroke='white' stroke-width='10' stroke-linecap='round'/><circle cx='28' cy='60' r='9' fill='white'/></svg>") center/70% no-repeat; }
+
+/* Brief card (story) */
+.brief { padding: 12px 14px; display: grid; gap: 6px; }
+.bhead { display: flex; justify-content: space-between; align-items: baseline; }
+.bhead b { font-size: 16px; } .bhead span { font-size: 15px; font-weight: 600; }
+.brief .line { display: flex; align-items: center; gap: 10px; padding-top: 4px; }
+.brief .cls { font-weight: 700; font-size: 17px; display: flex; flex-direction: column; }
+.brief .lbl { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; color: var(--pmuted); }
+.brief .when { color: var(--pmuted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.brief .week { margin-left: auto; color: var(--pmuted); }
+.brief .stats { border-top: .5px solid #2f3136; margin-top: 4px; padding: 8px 0 0; }
+/* Scroll-driven bits */
+.check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #5b5e66; flex: none; display: grid; place-items: center; transition: background-color .25s, border-color .25s; }
+.check.done { background: #0a84ff; border-color: #0a84ff; }
+.check.done::after { content: ""; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.row.gone { opacity: 0; transform: translateX(40px); transition: opacity .4s, transform .4s; }
+.plabel.ok { color: #30d158 !important; }
+.rise { will-change: transform, opacity; }
+@media (prefers-reduced-motion: reduce) { .rise { transform: none !important; opacity: 1 !important; } }
+
+/* Capturing layer: a colored glow behind each step, a giant clock during Today,
+   and the phone swinging up to face you as the page starts. */
+.glow { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .55;
+  background: radial-gradient(60vw 60vh at 78% 45%, var(--glow, transparent), transparent 70%); transition: --glow .8s; }
+.bigclock { position: fixed; z-index: 0; left: max(16px, env(safe-area-inset-left, 0px)); bottom: 3vh; pointer-events: none;
+  font-family: var(--mono); font-weight: 700; font-size: clamp(90px, 13vw, 190px); line-height: .85; letter-spacing: -.03em;
+  white-space: nowrap; color: var(--ink); opacity: 0; transition: opacity .5s; }
+.bigclock.on { opacity: .06; }
+.bigclock small { font-size: .22em; letter-spacing: .02em; margin-left: .15em; vertical-align: top; }
+@media (max-width: 860px) { .bigclock { display: none; } }
+.stage { perspective: 1400px; }
+#phone, .phone.inline:first-of-type { transform-origin: 50% 60%; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { #phone { transform: none !important; } .bigclock { display: none; } }
+
+/* Contour lines behind the page, like a topo map; they flow as you scroll. */
+.topo { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Huge words that slide sideways as you scroll, rows going opposite ways. */
+.bands { position: relative; z-index: 1; overflow: hidden; padding-block: 40px; margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); }
+.band { display: flex; gap: .35em; white-space: nowrap; font-family: var(--display); font-weight: 700; text-transform: uppercase;
+  font-size: clamp(56px, 11vw, 150px); line-height: .95; letter-spacing: -.03em; will-change: transform; }
+.band span { flex: none; }
+.band .o { color: transparent; -webkit-text-stroke: 1.5px var(--ink); }
+.band .a { color: var(--accent); }
+.band i { flex: none; align-self: center; width: .5em; height: .14em; border-radius: .07em; display: block; }
+
+/* Hero type: a serif italic turn inside the heavy sans, like a signature. */
+.it { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: -.01em; }
+.step h1 { font-size: clamp(52px, 8vw, 112px); line-height: .95; }
+.drawline { width: min(620px, 100%); height: auto; overflow: visible; }
+.drawline path { fill: none; stroke: var(--accent); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 700; stroke-dashoffset: 700; }
+.drawline circle { fill: var(--accent); transform-origin: 20px 30px; transform: scale(0); }
+@media (prefers-reduced-motion: no-preference) {
+  .drawline path { animation: draw 1.6s .3s cubic-bezier(.6,0,.2,1) forwards; }
+  .drawline circle { animation: pop .4s .1s cubic-bezier(.3,1.6,.5,1) forwards; }
+}
+@media (prefers-reduced-motion: reduce) { .drawline path { stroke-dashoffset: 0; } .drawline circle { transform: none; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop { to { transform: scale(1); } }
+
+/* Color floods: a pinned full screen that fills with each class color in turn as you scroll. */
+.flood { position: relative; z-index: 2; height: 900vh; width: 100vw; margin-left: calc(50% - 50vw); }
+.flood-pin { position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.flood-intro { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 14px; padding-inline: 24px; }
+.flood-intro h2 { font-size: clamp(44px, 8vw, 120px); line-height: .95; }
+.flood-intro p { margin: 0 auto; color: var(--muted); font-size: 18px; }
+.fl { position: absolute; inset: 0; background: var(--c); color: var(--fg); clip-path: circle(0% at 72% 58%); will-change: clip-path; }
+.fl-word { position: absolute; left: max(24px, 6vw); top: 42%; display: grid; white-space: nowrap; font-family: var(--display); font-weight: 700;
+  text-transform: uppercase; font-size: clamp(72px, 15vw, 250px); line-height: .82; letter-spacing: -.045em; will-change: transform; }
+.fl-word .it { text-transform: none; font-size: .62em; line-height: 1; margin-left: .06em; }
+.fl-card { position: absolute; left: max(24px, 6vw); bottom: 10vh; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 18px;
+  background: #111214; color: #f4f5f7; font-family: var(--sys); font-size: 16px; box-shadow: 0 30px 60px -20px rgba(0,0,0,.45); will-change: transform, opacity; max-width: calc(100vw - 48px); }
+.fl-card .bar { height: 34px; }
+.fl-card small { display: block; color: #9aa0aa; font-size: 13px; }
+.fl-count { position: absolute; right: max(24px, 6vw); top: 8vh; font-family: var(--mono); font-size: 14px; letter-spacing: .08em; }
+
+/* Dark look: glow on the accent words, the now line and the phone. */
+.step h1 em, .flood-intro h2 .it { text-shadow: 0 0 42px var(--neon); }
+.drawline { filter: drop-shadow(0 0 12px var(--neon)); }
+.phone { box-shadow: 0 0 0 1.5px #2c2e33, 0 40px 90px -30px rgba(0,0,0,.9), 0 0 120px -10px var(--glow, transparent); transition: box-shadow .8s; }
+.icon { box-shadow: 0 0 0 1px #2c2e33; }
+.glow { opacity: .9; }
+.progress .fill, .progress .dot { box-shadow: 0 0 14px var(--neon); }
+.band .a { text-shadow: 0 0 40px var(--neon); }
+
+/* Today runs over about three screens of scrolling on a computer, with the headline pinned. */
+.hero-pin { display: flex; flex-direction: column; gap: 18px; }
+.scrollcue { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+@media (min-width: 861px) {
+  .step:first-child { min-height: 300vh; }
+  .hero-pin { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 7vh); }
+}
+@media (max-width: 860px) { .scrollcue { display: none; } }
+
+/* Customize screen */
+.reorder { position: relative; height: calc(var(--rows, 3) * 40px); transition: height .35s ease; }
+.srow { position: absolute; left: 0; right: 0; height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  border-bottom: .5px solid #2f3136; background: var(--card); border-radius: 0; will-change: transform; }
+.srow.lift { z-index: 2; border-radius: 10px; box-shadow: 0 10px 24px -8px rgba(0,0,0,.8); background: #26282d; }
+.srow .sic { width: 18px; text-align: center; color: #0a84ff; font-size: 12px; }
+.srow .grip { margin-left: auto; color: var(--pmuted); font-size: 15px; }
+.srow.added { opacity: 0; }
+.addmenu { position: absolute; z-index: 3; right: 10px; top: 100%; margin-top: 6px; display: grid; gap: 4px; padding: 10px 12px; min-width: 150px;
+  background: rgba(44,45,50,.97); border-radius: 12px; box-shadow: 0 16px 30px -10px rgba(0,0,0,.8); font-size: 12px;
+  opacity: 0; transform: scale(.92); transform-origin: top right; transition: opacity .25s, transform .25s; pointer-events: none; }
+.addmenu.show { opacity: 1; transform: none; }
+.addmenu b { color: #0a84ff; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 10px 12px; font-size: 11.5px; }
+.chips span { display: flex; align-items: center; gap: 5px; }
+.chips i { width: 4px; height: 16px; border-radius: 2px; display: block; }
+.timepill { margin-left: auto; font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 8px; background: #2c2e33; transition: background-color .3s, color .3s; font-variant-numeric: tabular-nums; }
+.timepill.changed { background: #0a84ff; color: #fff; }
+
+/* Pre-order sign-up */
+.signup { position: relative; z-index: 1; display: grid; gap: 18px; padding-block: 80px 40px; justify-items: start; }
+.signup h2 { font-size: clamp(40px, 6vw, 84px); line-height: .95; }
+.signup > p { color: var(--muted); font-size: 18px; }
+.signup-form { display: flex; flex-wrap: wrap; gap: 10px; width: min(560px, 100%); }
+.signup-form input { flex: 1 1 240px; min-width: 0; font: inherit; font-size: 17px; color: var(--ink); background: #121418; border: 1px solid var(--line);
+  border-radius: 99px; padding: 14px 20px; }
+.signup-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: transparent; }
+.signup-form input[aria-invalid="true"] { border-color: #ff453a; }
+.signup-btn { flex: none; border: 0; cursor: pointer; font-family: var(--display); font-weight: 700; font-size: 17px; color: #fff; background: var(--accent); text-decoration: none;
+  padding: 14px 24px; border-radius: 99px; box-shadow: 0 0 40px -6px var(--neon); }
+.signup-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.signup-btn[aria-disabled="true"] { opacity: .55; }
+.signup-note { color: var(--muted); font-size: 14px; }
+.signup-note.ok { color: #30d158; }
+.signup-note.err { color: #ff6961; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Smooth scrolling (Lenis) */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+
+/* Closing */
+.closing { position: relative; z-index: 1; padding-block: 40px 30px; display: grid; gap: 22px; }
+.closing h2 { font-size: clamp(32px, 4.2vw, 50px); }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 28px; }
+.trio h3 { font-family: var(--display); font-size: 20px; margin: 0 0 6px; }
+.trio p { color: var(--muted); font-size: 16px; }
+footer { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding-block: 40px 56px; color: var(--muted); font-size: 14px; }
+
+@media (max-width: 860px) {
+  .story { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .stage { display: none; }
+  .step, .step:first-child, .step:last-child { min-height: 0; padding-block: 36px; justify-content: flex-start; gap: 16px; }
+  .step:first-child { padding-top: 8px; }
+  .phone.inline { width: 100%; max-width: 330px; height: 640px; margin-top: 10px; }
+  .phone.inline .screen { transform: none; }
+  .trio { grid-template-columns: minmax(0,1fr); gap: 20px; }
+  .step p { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen { transition: none; }
+}
+</style>
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+
+<canvas class="topo" id="topo" aria-hidden="true"></canvas>
+<div class="glow" aria-hidden="true"></div>
+<div class="bigclock" id="bigclock" aria-hidden="true">8:00<small>AM</small></div>
+<div class="progress" aria-hidden="true"><div class="fill"></div><div class="dot"></div></div>
+
+<div class="page">
+  <header class="top">
+    <div class="brand">
+      <span class="icon" aria-hidden="true"><svg viewBox="0 0 120 120"><path d="M36 34h48M36 86h30" stroke="#5f5f5f" stroke-width="10" stroke-linecap="round"/><path d="M36 60h56" stroke="#fff" stroke-width="10" stroke-linecap="round"/><circle cx="28" cy="60" r="9" fill="#fff"/></svg></span>
+      Day Board
+    </div>
+    <span class="chip">iPhone · Mac · Widgets</span>
+  </header>
+
+  <div class="story">
+    <div class="steps">
+      <section class="step" data-screen="0">
+        <div class="hero-pin">
+        <h1>Your whole <span class="it">school day,</span> on <em>one screen.</em></h1>
+        <p>Day Board pulls your class schedule, Google Classroom, tests and calendar into one calm view, so you know what's next without opening five apps.</p>
+        <svg class="drawline" viewBox="0 0 620 60" aria-hidden="true"><path d="M20 30 C 140 30, 170 8, 260 22 S 420 52, 520 30 S 590 24, 606 30"/><circle cx="20" cy="30" r="13"/></svg>
+        <div class="facts"><span><b>5</b> tabs</span><span>checks school every <b>30 min</b></span><span><b>read-only</b></span></div>
+        <div class="scrollcue" aria-hidden="true">Scroll to run the day ↓</div>
+        </div>
+      </section>
+
+      <section class="step" data-screen="1">
+        <div class="kicker"><span class="colors" aria-hidden="true"><span class="b-history"></span><span class="b-math"></span><span class="b-science"></span><span class="b-english"></span><span class="b-french"></span></span>Your color code</div>
+        <h2>Every class has its color, everywhere.</h2>
+        <p>Pick a color for each subject once. The same bar follows the class through your schedule, its homework, its tests and the Next up card, so you can read the whole week at a glance.</p>
+      </section>
+
+      <section class="step" data-screen="2">
+        <div class="kicker">Google Classroom</div>
+        <h2>Homework sorted by when it's due.</h2>
+        <p>Missing work sits in red at the top, then Due today, tomorrow, this week and later. Tests get their own countdown, pulled from Classroom and your calendar without duplicates.</p>
+      </section>
+
+      <section class="step" data-screen="3">
+        <div class="kicker">What's new</div>
+        <h2>New assignments show up on their own.</h2>
+        <p>Every 30 minutes Day Board checks Classroom and your schedule, and tells you what was posted, which due dates moved, and which classes changed.</p>
+      </section>
+
+      <section class="step" data-screen="4">
+        <div class="kicker">The F1 tab</div>
+        <h2>Race weekends, in your time zone.</h2>
+        <p>The next Grand Prix with a live countdown and every session time, the last podium, driver and team standings, and the full season. Tap a race for results, then jump into the F1 app.</p>
+      </section>
+
+      <section class="step" data-screen="5">
+        <div class="kicker">Widgets and Mac</div>
+        <h2>Glance without opening anything.</h2>
+        <p>Home screen and lock screen widgets show your next class, the next test and what's missing, and they switch the moment each class starts. The same board runs as a Mac app, with two columns when the window is wide.</p>
+      </section>
+
+      <section class="step" data-screen="6">
+        <div class="kicker">Make it yours</div>
+        <h2>Your board, <span class="it">your order.</span></h2>
+        <p>Drag tabs and sections into the order you think in, hide what you don't use, and add only what you want, like Due this week, Tests, Workouts or Reminders. Pick each class's color, and choose when your morning summary, class reminders and nightly due-tomorrow list arrive.</p>
+        <div class="facts"><span><b>5</b> tabs to reorder</span><span><b>20</b> sections to mix</span><span>every class <b>your color</b></span><span>notifications <b>on your time</b></span></div>
+      </section>
+    </div>
+
+    <div class="stage">
+      <div class="phone" id="phone" role="img" aria-label="Day Board on an iPhone, changing to match the section you're reading.">
+        <div class="notch"></div>
+
+        <div class="banner" id="banner" aria-hidden="true">
+          <span class="ic"><svg viewBox="0 0 120 120"><path d="M36 34h48M36 86h30" stroke="#5f5f5f" stroke-width="10" stroke-linecap="round"/><path d="M36 60h56" stroke="#fff" stroke-width="10" stroke-linecap="round"/><circle cx="28" cy="60" r="9" fill="#fff"/></svg></span>
+          <span><b id="bannerTitle">New assignment</b><span id="bannerText">English III · Reading journal</span></span>
+        </div>
+
+        <!-- 0: Today, live -->
+        <div class="screen on" data-s="0">
+          <div class="ptitle">Monday, October 19</div>
+          <div class="pcard brief">
+            <div class="bhead"><b>Good morning, Ryan</b><span>☀︎ 58°</span></div>
+            <div class="sub">Partly Cloudy · H:58° L:44°</div>
+            <div class="line">
+              <span class="bar tall b-science"></span>
+              <div><div class="cls"><span class="lbl" id="nextPill">NEXT CLASS</span>Biology</div><div class="when" id="nextWhen">8:30 · in 12 min</div></div>
+              <span class="week">›</span>
+            </div>
+            <div class="stats">
+              <div><b class="red" id="missing">2</b><small>missing</small></div>
+              <div><b>2</b><small>due tomorrow</small></div>
+              <div><b>1</b><small>test</small></div>
+            </div>
+          </div>
+          <div class="plabel"><span>Classes · Today</span><span>⌄</span></div>
+          <div class="pcard" id="todayRows">
+            <div class="row"><span class="time"><b>8:30</b><small>9:20</small></span><span class="bar b-science"></span>Biology<span class="nowtag">Now</span></div>
+            <div class="row"><span class="time"><b>9:45</b><small>10:35</small></span><span class="bar b-history"></span>World History<span class="nowtag">Now</span></div>
+            <div class="row"><span class="time"><b>10:40</b><small>11:30</small></span><span class="bar b-math"></span>Geometry<span class="nowtag">Now</span></div>
+            <div class="row"><span class="time"><b>11:35</b><small>12:25</small></span><span class="bar b-english"></span>English III<span class="nowtag">Now</span></div>
+            <div class="row"><span class="time"><b>1:05</b><small>1:55</small></span><span class="bar b-french"></span>French<span class="nowtag">Now</span></div>
+          </div>
+          <div class="tabbar"><span class="on">Today</span><span>School</span><span>Inbox</span><span>Calendar</span><span>F1</span></div>
+        </div>
+
+        <!-- 1: Week view with colors -->
+        <div class="screen" data-s="1">
+          <div class="ptitle">This week</div>
+          <div class="plabel"><span>Tuesday, Oct 20</span></div>
+          <div class="pcard">
+            <div class="row"><span class="time"><b>All</b><small>day</small></span><span class="bar b-science"></span><span class="grow clip">Ecology Test #2</span><span class="end red">Test</span></div>
+            <div class="row"><span class="time"><b>8:30</b><small>9:20</small></span><span class="bar b-math"></span>Geometry</div>
+            <div class="row"><span class="time"><b>9:25</b><small>9:40</small></span><span class="bar b-other"></span>Advisory</div>
+            <div class="row"><span class="time"><b>9:45</b><small>10:35</small></span><span class="bar b-science"></span>Biology</div>
+            <div class="row"><span class="time"><b>11:35</b><small>12:25</small></span><span class="bar b-english"></span>English III</div>
+          </div>
+          <div class="plabel"><span>Wednesday, Oct 21</span></div>
+          <div class="pcard">
+            <div class="row"><span class="time"><b>8:30</b><small>9:20</small></span><span class="bar b-history"></span>World History</div>
+            <div class="row"><span class="time"><b>9:45</b><small>10:35</small></span><span class="bar b-french"></span>French</div>
+            <div class="row"><span class="time"><b>10:40</b><small>11:30</small></span><span class="bar b-math"></span>Geometry</div>
+          </div>
+        </div>
+
+        <!-- 2: Classroom -->
+        <div class="screen" data-s="2">
+          <div class="ptitle">School</div>
+          <div class="plabel red" id="missLabel"><span>⚠ Missing · 1</span></div>
+          <div class="pcard">
+            <div class="row" id="missRow"><span class="check" id="missCheck" aria-hidden="true"></span><span class="bar b-history"></span><span class="grow"><span class="clip">Notes: The Enlightenment</span><span class="sub">World History</span></span><span class="end red">Oct 9</span></div>
+          </div>
+          <div class="plabel"><span>Due today · 1</span></div>
+          <div class="pcard">
+            <div class="row"><span class="bar b-french"></span><span class="grow"><span class="clip">Vocabulary practice</span><span class="sub">French</span></span><span class="end">11:59 PM</span></div>
+          </div>
+          <div class="plabel"><span>Due this week · 2</span></div>
+          <div class="pcard">
+            <div class="row"><span class="bar b-english"></span><span class="grow"><span class="clip">Reading journal</span><span class="sub">English III</span></span><span class="end">Wed</span></div>
+            <div class="row"><span class="bar b-math"></span><span class="grow"><span class="clip">Lines and angles practice</span><span class="sub">Geometry</span></span><span class="end">Thu</span></div>
+          </div>
+          <div class="plabel"><span>Tests · 2</span></div>
+          <div class="pcard">
+            <div class="row"><span class="date red"><small>OCT</small><b>20</b></span><span class="bar b-science"></span><span class="grow clip">Ecology Test #2</span><span class="end red">in 1 day</span></div>
+            <div class="row"><span class="date"><small>OCT</small><b>23</b></span><span class="bar b-french"></span><span class="grow clip">Contrôle 3</span><span class="end">in 4 days</span></div>
+          </div>
+        </div>
+
+        <!-- 3: What's new, items arrive live -->
+        <div class="screen" data-s="3">
+          <div class="ptitle">Today</div>
+          <div class="plabel"><span>✦ What's new</span><span>⌄</span></div>
+          <div class="pcard feed" id="feed"></div>
+        </div>
+
+        <!-- 4: F1 -->
+        <div class="screen" data-s="4">
+          <div class="ptitle">F1 2026</div>
+          <div class="pcard" style="padding:14px;display:grid;gap:6px">
+            <span><span class="pill f1pill">NEXT RACE</span> <span class="sub">Round 18</span></span>
+            <b style="font-size:19px">United States Grand Prix</b>
+            <span class="sub">Austin, USA</span>
+            <span class="count" id="f1count">6d 04:12:09</span>
+            <span class="sub">until lights out · Sun 4:00 PM</span>
+          </div>
+          <div class="plabel"><span>Last race · Singapore</span></div>
+          <div class="pcard" style="display:grid;grid-template-columns:repeat(3,1fr);text-align:center;padding:12px 4px">
+            <div>🥈<br><b>LEC</b></div><div>🥇<br><b>VER</b></div><div>🥉<br><b>ANT</b></div>
+          </div>
+          <div class="plabel"><span>Standings · Drivers</span></div>
+          <div class="pcard">
+            <div class="row"><b style="width:16px">1</b><span class="team" style="background:#27f4d2"></span><span class="grow">Antonelli<br><span class="sub">Mercedes</span></span><b>340</b></div>
+            <div class="row"><b style="width:16px">2</b><span class="team" style="background:#27f4d2"></span><span class="grow">Russell<br><span class="sub">Mercedes</span></span><b>238</b></div>
+            <div class="row"><b style="width:16px">3</b><span class="team" style="background:#e8002d"></span><span class="grow">Hamilton<br><span class="sub">Ferrari</span></span><b>229</b></div>
+          </div>
+        </div>
+
+        <!-- 6: Customize, acted out by scrolling -->
+        <div class="screen" data-s="6">
+          <div class="ptitle">Customize</div>
+          <div class="plabel"><span><b style="color:var(--pink)">Today</b> sections</span><span>Edit</span></div>
+          <div class="pcard reorder" id="reorder">
+            <div class="srow" data-k="brief"><span class="sic">☀︎</span>Morning brief<span class="grip">≡</span></div>
+            <div class="srow" data-k="classes"><span class="sic">▦</span>Classes<span class="grip">≡</span></div>
+            <div class="srow" data-k="due"><span class="sic">!</span>Due soon<span class="grip">≡</span></div>
+            <div class="srow added" data-k="workouts"><span class="sic">↯</span>Workouts<span class="grip">≡</span></div>
+            <div class="addmenu" id="addmenu"><span class="sub">Add a section</span><b>Workouts</b><span>Tests</span><span>Reminders</span><span>Due this week</span></div>
+          </div>
+          <div class="plabel"><span><b style="color:var(--pink)">Class colors</b></span></div>
+          <div class="pcard chips">
+            <span><i class="b-history"></i>History</span><span><i class="b-math"></i>Math</span><span><i class="b-science"></i>Science</span><span><i class="b-english"></i>English</span><span><i class="b-french"></i>French</span>
+          </div>
+          <div class="plabel"><span><b style="color:var(--pink)">Notifications</b></span></div>
+          <div class="pcard">
+            <div class="row"><span class="grow">Morning summary</span><span class="timepill" id="mtime">7:00 AM</span></div>
+            <div class="row"><span class="grow">Before each class</span><span class="end">5 min</span></div>
+            <div class="row"><span class="grow">Nightly: due tomorrow</span><span class="end">8:00 PM</span></div>
+          </div>
+        </div>
+
+        <!-- 5: Home screen widgets -->
+        <div class="screen" data-s="5" style="inset:0">
+          <div class="home">
+            <div class="grid">
+              <div class="w">
+                <div class="flip" id="wflip">
+                  <span class="lbl" id="wlbl">NEXT</span>
+                  <div class="t" id="wt"><span class="bar b-science" style="height:18px"></span>Biology</div>
+                  <div class="m" id="wm">8:30 AM</div>
+                </div>
+                <span class="sp"></span>
+                <span class="miss">⚠ 2 missing</span>
+              </div>
+              <div class="w">
+                <span class="lbl" style="color:#ff453a">TEST</span>
+                <div class="t">Ecology #2</div>
+                <div class="m red">Tomorrow</div>
+                <span class="sp"></span>
+                <span class="m" style="font-size:10.5px">Biology</span>
+              </div>
+              <div class="w wide">
+                <span class="lbl" style="color:#8d929b">DUE TODAY</span>
+                <div class="t" style="font-size:14px"><span class="bar b-french" style="height:14px"></span>Vocabulary practice</div>
+                <div class="t" style="font-size:14px"><span class="bar b-english" style="height:14px"></span>Reading journal</div>
+              </div>
+              <div class="apps"><i class="db"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="flood" id="flood" aria-label="Five classes, five colors">
+    <div class="flood-pin">
+      <div class="flood-intro">
+        <div class="kicker" style="justify-content:center">Keep scrolling</div>
+        <h2>Five classes. <span class="it">Five colors.</span></h2>
+        <p>The color you pick follows each class everywhere in Day Board.</p>
+      </div>
+      <div class="fl" style="--c:var(--c-history);--fg:#111214"><div class="fl-word">History<span class="it">reading</span></div>
+        <div class="fl-card"><span class="bar b-history"></span><span>Unit 3 reading<small>World History · Due Thu</small></span></div><div class="fl-count">01 / 05</div></div>
+      <div class="fl" style="--c:var(--c-math);--fg:#f4f5f7"><div class="fl-word">Math<span class="it">practice</span></div>
+        <div class="fl-card"><span class="bar b-math"></span><span>Lines and angles practice<small>Geometry · Due tomorrow</small></span></div><div class="fl-count">02 / 05</div></div>
+      <div class="fl" style="--c:#f2f3f5;--fg:#07080a"><div class="fl-word">Science<span class="it">test</span></div>
+        <div class="fl-card"><span class="bar b-science"></span><span>Ecology Test #2<small>Biology · Tomorrow, in red</small></span></div><div class="fl-count">03 / 05</div></div>
+      <div class="fl" style="--c:var(--c-english);--fg:#111214"><div class="fl-word">English<span class="it">journal</span></div>
+        <div class="fl-card"><span class="bar b-english"></span><span>Reading journal<small>English III · New · just now</small></span></div><div class="fl-count">04 / 05</div></div>
+      <div class="fl" style="--c:var(--c-french);--fg:#111214"><div class="fl-word">French<span class="it">contrôle</span></div>
+        <div class="fl-card"><span class="bar b-french"></span><span>Contrôle 3<small>French · in 4 days</small></span></div><div class="fl-count">05 / 05</div></div>
+    </div>
+  </section>
+
+  <div class="bands" aria-hidden="true">
+    <div class="band" data-speed="-0.45"><span>Classes</span><i class="b-history"></i><span class="o">Homework</span><i class="b-math"></i><span>Tests</span><i class="b-english"></i><span class="o">Classes</span><i class="b-french"></i><span>Homework</span><i class="b-science"></i><span class="o">Tests</span></div>
+    <div class="band" data-speed="0.45"><span class="a">What's next</span><i class="b-french"></i><span class="o">Race week</span><i class="b-history"></i><span class="a">What's next</span><i class="b-english"></i><span class="o">Race week</span><i class="b-math"></i><span class="a">What's next</span></div>
+  </div>
+
+  <section class="closing">
+    <div class="kicker">How it works</div>
+    <h2>Built to read, never to change.</h2>
+    <div class="trio">
+      <div><h3>A small school script</h3><p>It runs in your own school Google account and reads Classroom and your class schedule every 30 minutes from 8 AM to 9 PM. Only the app with your secret key can see the results.</p></div>
+      <div><h3>Your calendar and reminders</h3><p>Events you already see as classes or tests are hidden, so only the extras, like family plans, show up.</p></div>
+      <div><h3>Read-only, on your devices</h3><p>Day Board can't change, send or delete anything, and your sign-ins stay in your device's Keychain.</p></div>
+    </div>
+  </section>
+
+  <section class="signup" id="signup" aria-labelledby="signupTitle">
+    <div class="kicker">Pre-order · Coming soon</div>
+    <h2 id="signupTitle">Be first <span class="it">on the list.</span></h2>
+    <p>Day Board isn't on the App Store yet. Reserve your spot and you'll get one email the day it launches, plus the occasional update while it's being built. It's free to sign up.</p>
+    <form class="signup-form" id="signupForm" novalidate>
+      <label class="sr" for="signupEmail">Email</label>
+      <input id="signupEmail" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+      <button class="signup-btn" id="signupGo" type="submit">Reserve my spot</button>
+    </form>
+    <p class="signup-note" id="signupNote" aria-live="polite">Your email is only used for Day Board updates.</p>
+  </section>
+
+  <footer>
+    <span>Day Board is a personal project by Ryan, built in SwiftUI. Not on the App Store yet.</span>
+    <span class="colors" aria-hidden="true"><span class="b-history"></span><span class="b-math"></span><span class="b-science"></span><span class="b-english"></span><span class="b-french"></span></span>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  // Smooth momentum scrolling with a mouse or trackpad (touch keeps the phone's own scrolling).
+  if (window.Lenis && document.compatMode === "CSS1Compat" && !matchMedia("(prefers-reduced-motion: reduce)").matches && matchMedia("(pointer: fine)").matches) {
+    let ticks = 0;
+    const probe = () => { if (++ticks < 3) requestAnimationFrame(probe); else start(); };
+    requestAnimationFrame(probe);
+    function start() {
+      const lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 1 });
+      const raf = time => { lenis.raf(time); requestAnimationFrame(raf); };
+      requestAnimationFrame(raf);
+      // If the page is hidden and frames stop, hand scrolling back to the browser.
+      document.addEventListener("visibilitychange", () => document.hidden ? lenis.stop() : lenis.start());
+    }
+  }
+})();
+</script>
+<script>
+(() => {
+  const root = document.documentElement;
+  const quiet = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const screens = [...document.querySelectorAll(".screen")];
+  const steps = [...document.querySelectorAll(".step")];
+  const banner = document.getElementById("banner");
+  let current = 0;
+
+  const glows = ["rgba(10,132,255,.35)", "rgba(255,69,58,.30)", "rgba(48,209,88,.30)", "rgba(255,214,10,.30)", "rgba(225,6,0,.32)", "rgba(100,210,255,.30)", "rgba(191,90,242,.30)"];
+  function show(i) {
+    root.style.setProperty("--glow", glows[i]);
+    document.getElementById("bigclock").classList.toggle("on", i === 0);
+    if (i === current || narrow) return;
+    current = i;
+    screens.forEach(s => s.classList.toggle("on", Number(s.dataset.s) === i));
+    banner.classList.remove("show");
+  }
+
+  // On phones each section gets its own phone (built below), so every screen is live at once.
+  const narrow = matchMedia("(max-width: 860px)").matches;
+  const live = i => narrow || current === i;
+
+  // The step whose middle is closest to the middle of the window decides what the phone shows.
+  // (Measured on scroll, because the artifact viewer's frame ignores IntersectionObserver margins.)
+  function pick() {
+    const mid = innerHeight / 2;
+    let best = 0, bestDist = Infinity;
+    steps.forEach(st => {
+      const r = st.getBoundingClientRect();
+      const d = Math.abs(r.top + r.height / 2 - mid);
+      if (d < bestDist) { bestDist = d; best = Number(st.dataset.screen); }
+    });
+    show(best);
+  }
+
+  // How far through each step you've scrolled, 0 to 1. The phone acts this out, so scrolling
+  // moves the day forward, checks off homework, brings in news and slides in the widgets.
+  const amount = st => {
+    const r = st.getBoundingClientRect();
+    // The first step is already on screen when the page opens, so its day starts at the top of the page.
+    const first = st.dataset.screen === "0";
+    const start = first ? r.top + scrollY : innerHeight * 0.85, end = innerHeight * (first ? 0.5 : 0.15) - r.height;
+    return Math.min(1, Math.max(0, (start - r.top) / (start - end)));
+  };
+  const scrubbers = [];
+  function scrub() { steps.forEach(st => { const i = Number(st.dataset.screen); scrubbers.forEach(fn => fn(i, amount(st))); }); }
+
+  // The now line at the top fills as you scroll.
+  function progress() {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    root.style.setProperty("--p", max > 0 ? Math.min(1, Math.max(0, scrollY / max)).toFixed(4) : "0");
+    pick();
+    scrub();
+  }
+  // Cheap enough to run on every scroll event, which also works where animation frames are paused.
+  addEventListener("scroll", progress, { passive: true });
+  addEventListener("resize", progress);
+  // Backup for viewers that hold back scroll events (some embedded previews do).
+  setInterval(progress, 500);
+  progress();
+
+  // F1 countdown to the US Grand Prix (Oct 25, 2026, 4:00 PM Eastern). Ticks even with reduced motion.
+  const race = Date.parse("2026-10-25T20:00:00Z");
+  const f1 = document.getElementById("f1count");
+  function tickF1() {
+    let s = Math.max(0, Math.floor((race - Date.now()) / 1000));
+    const d = Math.floor(s / 86400); s %= 86400;
+    const pad = n => String(n).padStart(2, "0");
+    f1.textContent = (d ? d + "d " : "") + pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
+  }
+  tickF1(); setInterval(tickF1, 1000);
+
+  // What's new: starts with two items so it's never empty.
+  const feed = document.getElementById("feed");
+  const news = [
+    ["b-english", "Reading journal", "English III · New · just now"],
+    ["b-math", "Lines and angles practice", "Geometry · Due date → Thu · 2m ago"],
+    ["b-other", "Theme and cover vote", "Yearbook · New · 5m ago"],
+    ["b-science", "Ecology Test #2", "Biology · Added to calendar · Tue"],
+    ["b-french", "Vocabulary practice", "French · New · 12m ago"],
+    ["b-history", "Unit 3 reading", "World History · New · 20m ago"]
+  ];
+  let ni = 0;
+  function addNews(animate) {
+    const [bar, title, sub] = news[ni % news.length]; ni++;
+    const row = document.createElement("div");
+    row.className = "row" + (animate ? " fresh" : "");
+    row.innerHTML = '<span class="bar ' + bar + '" style="height:32px"></span><span class="grow"><span class="clip"></span><span class="sub"></span></span>';
+    row.querySelector(".clip").textContent = title;
+    row.querySelector(".sub").textContent = sub;
+    feed.prepend(row);
+    while (feed.children.length > 5) feed.lastElementChild.remove();
+  }
+  addNews(false);
+
+  // --- Scroll scenes ---
+  const rise = (els, f, spread) => els.forEach((el, k) => {
+    const g = Math.min(1, Math.max(0, f * (1 + spread * els.length) - spread * k));
+    el.classList.add("rise");
+    el.style.opacity = (0.15 + 0.85 * g).toFixed(3);
+    el.style.transform = "translateY(" + ((1 - g) * 28).toFixed(1) + "px)";
+  });
+
+  // Today: scrolling runs the clock from 8:00 AM to 2:00 PM.
+  const when = document.getElementById("nextWhen");
+  const pill = document.getElementById("nextPill");
+  const rows = [...document.querySelectorAll("#todayRows .row")];
+  const nextName = document.querySelector("#nextPill").parentElement;
+  const nextBar = document.querySelector(".brief .bar");
+  const bigclock = document.getElementById("bigclock");
+  const sched = [[510, 560, "Biology", "science"], [585, 635, "World History", "history"], [640, 690, "Geometry", "math"],
+                 [695, 745, "English III", "english"], [785, 835, "French", "french"]];
+  const hm = m => ((Math.floor(m / 60) + 11) % 12 + 1) + ":" + String(m % 60).padStart(2, "0");
+  const bTitle = document.getElementById("bannerTitle"), bText = document.getElementById("bannerText");
+  const alerts = [[0.06, "Good morning, Ryan", "58° and partly cloudy · 2 missing, 2 due tomorrow"],
+                  [0.2, "Biology in 5 min", "8:30–9:20 · Test today"],
+                  [0.55, "English III in 5 min", "11:35–12:25"]];
+  let lastF0 = 0, bannerTimer = 0;
+  scrubbers.push((i, f) => {
+    if (i !== 0) return;
+    // Five-minute steps, so the countdown reads calmly instead of flickering on every pixel.
+    const t = Math.round((480 + f * 360) / 5) * 5;
+    const now = sched.find(c => c[0] <= t && t < c[1]);
+    const next = sched.find(c => c[0] > t);
+    const show = now || next;
+    if (show) {
+      pill.textContent = now ? "NOW" : "NEXT CLASS";
+      nextName.lastChild.textContent = show[2];
+      nextBar.className = "bar tall b-" + show[3];
+      when.textContent = now ? "until " + hm(now[1]) : hm(next[0]) + " · in " + (next[0] - t) + " min";
+    } else {
+      pill.textContent = "TODAY";
+      nextName.lastChild.textContent = "All done";
+      nextBar.className = "bar tall b-other";
+      when.textContent = "No more classes today";
+    }
+    rows.forEach((r, k) => {
+      r.classList.toggle("past", sched[k][1] <= t);
+      r.classList.toggle("now", sched[k] === now);
+    });
+    // Notifications drop in as you scroll past their moment.
+    alerts.forEach(([at, title, text]) => {
+      if (lastF0 < at && f >= at) {
+        bTitle.textContent = title; bText.textContent = text;
+        banner.classList.add("show");
+        clearTimeout(bannerTimer);
+        bannerTimer = setTimeout(() => banner.classList.remove("show"), 2200);
+      }
+    });
+    lastF0 = f;
+    const h = Math.floor(t / 60);
+    // Always the same width (a figure space stands in for a missing tens digit), so it never jumps.
+    bigclock.innerHTML = String((h + 11) % 12 + 1).padStart(2, "\u2007") + ":" + String(t % 60).padStart(2, "0") + "<small>" + (h < 12 ? "AM" : "PM") + "</small>";
+  });
+
+  // The phone starts tilted back and swings up to face you over the first part of the page.
+  const heroPhone = narrow ? null : document.getElementById("phone");
+  scrubbers.push((i, f) => {
+    if (i !== 0 || quiet) return;
+    const target = heroPhone || document.querySelector('.step[data-screen="0"] .phone');
+    if (!target) return;
+    const g = Math.min(1, f / (narrow ? 0.45 : 0.12)), e = 1 - Math.pow(1 - g, 3);
+    target.style.transform = "rotateX(" + ((1 - e) * 28).toFixed(2) + "deg) rotateY(" + ((1 - e) * -16).toFixed(2) +
+      "deg) rotateZ(" + ((1 - e) * 4).toFixed(2) + "deg) scale(" + (1.08 - 0.08 * e).toFixed(3) + ")";
+  });
+
+  // Colors: the week's rows slide in one after another.
+  const weekRows = [...document.querySelectorAll('.screen[data-s="1"] .row')];
+  scrubbers.push((i, f) => { if (i === 1) rise(weekRows, f * 1.6, 0.18); });
+
+  // Classroom: the missing assignment gets checked off halfway down.
+  const missRow = document.getElementById("missRow"), missCheck = document.getElementById("missCheck"),
+        missLabel = document.getElementById("missLabel"), missCount = document.getElementById("missing");
+  scrubbers.push((i, f) => {
+    if (i !== 2) return;
+    const done = f > 0.45, gone = f > 0.6;
+    missCheck.classList.toggle("done", done);
+    missRow.classList.toggle("gone", gone);
+    missLabel.classList.toggle("red", !gone);
+    missLabel.classList.toggle("ok", gone);
+    missLabel.firstElementChild.textContent = gone ? "✓ Nothing missing" : "⚠ Missing · 1";
+    missCount.textContent = gone ? "1" : "2";
+  });
+
+  // What's new: a new item arrives every few steps of scrolling.
+  let shownNews = 1;
+  scrubbers.push((i, f) => {
+    if (i !== 3) return;
+    const want = 1 + Math.floor(f * 5.5);
+    while (shownNews < want) { addNews(!quiet); shownNews++; }
+  });
+
+  // F1 and widgets: cards rise into place.
+  const f1Cards = [...document.querySelectorAll('.screen[data-s="4"] .pcard')];
+  // Make it yours: sections reorder, Workouts gets added, and the morning summary moves to 6:30,
+  // all as you scroll. (Class colors stay Ryan's own: History red, Math blue and so on.)
+  const sRows = Object.fromEntries([...document.querySelectorAll("#reorder .srow")].map(r => [r.dataset.k, r]));
+  const reorder = document.getElementById("reorder"), addmenu = document.getElementById("addmenu"), mtime = document.getElementById("mtime");
+  const span = (f, a, b) => Math.min(1, Math.max(0, (f - a) / (b - a)));
+  scrubbers.push((i, f) => {
+    if (i !== 6) return;
+    const swap = span(f, 0.18, 0.36);            // Due soon slides above Classes
+    const add = span(f, 0.5, 0.6);               // Workouts drops in
+    const lift = swap > 0 && swap < 1;
+    sRows.brief.style.transform = "translateY(0px)";
+    sRows.classes.style.transform = "translateY(" + (40 + swap * 40) + "px)";
+    sRows.due.style.transform = "translateY(" + (80 - swap * 40) + "px) scale(" + (lift ? 1.03 : 1) + ")";
+    sRows.due.classList.toggle("lift", lift);
+    sRows.workouts.style.transform = "translateY(" + (120 - (1 - add) * 14) + "px)";
+    sRows.workouts.style.opacity = add.toFixed(3);
+    reorder.style.setProperty("--rows", add > 0 ? 4 : 3);
+    addmenu.classList.toggle("show", f > 0.4 && f < 0.56);
+    const later = f > 0.84;
+    mtime.textContent = later ? "6:30 AM" : "7:00 AM";
+    mtime.classList.toggle("changed", later);
+  });
+
+  const widgets = [...document.querySelectorAll('.screen[data-s="5"] .w, .screen[data-s="5"] .apps')];
+  scrubbers.push((i, f) => { if (i === 4) rise(f1Cards, f * 1.6, 0.25); if (i === 5) rise(widgets, f * 1.6, 0.25); });
+  scrub();
+
+  if (narrow) {
+    const stage = document.querySelector(".stage");
+    steps.forEach(st => {
+      const i = st.dataset.screen;
+      const scr = document.querySelector('.screen[data-s="' + i + '"]');
+      const ph = document.createElement("div");
+      ph.className = "phone inline";
+      ph.setAttribute("role", "img");
+      ph.setAttribute("aria-label", "Day Board on an iPhone");
+      ph.innerHTML = '<div class="notch"></div>';
+      if (i === "0") ph.appendChild(banner);
+      scr.classList.add("on");
+      ph.appendChild(scr);
+      st.appendChild(ph);
+    });
+    stage.remove();
+  }
+
+  // Color floods: each class color pours out from the right as you scroll through the pinned screen.
+  const flood = document.getElementById("flood");
+  const layers = [...flood.querySelectorAll(".fl")];
+  function pour() {
+    const r = flood.getBoundingClientRect();
+    const f = Math.min(1, Math.max(0, -r.top / (r.height - innerHeight)));
+    const seg = f * (layers.length + 0.4) - 0.3;
+    layers.forEach((el, k) => {
+      // local: 0 → 1 over this class's share of the scroll. Pour (0–0.3), settle, then hold.
+      const local = Math.min(1, Math.max(0, seg - k));
+      const pourIn = 1 - Math.pow(1 - Math.min(1, local / 0.3), 3);
+      el.style.clipPath = "circle(" + (pourIn * 150).toFixed(2) + "% at 72% 58%)";
+      const settle = 1 - Math.pow(1 - Math.min(1, local / 0.4), 3);
+      el.querySelector(".fl-word").style.transform = "translate3d(" + ((1 - settle) * 40 - local * 4).toFixed(2) + "vw, -50%, 0)";
+      const card = el.querySelector(".fl-card");
+      const c = Math.min(1, Math.max(0, (local - 0.15) / 0.2));
+      card.style.opacity = c.toFixed(3);
+      card.style.transform = "translate3d(0," + ((1 - c) * 60).toFixed(1) + "px,0) rotate(" + ((1 - c) * -4).toFixed(2) + "deg)";
+    });
+  }
+  addEventListener("scroll", pour, { passive: true });
+  addEventListener("resize", pour);
+  setInterval(pour, 500);
+  pour();
+
+  // Huge words slide sideways with the scroll.
+  const bandRows = [...document.querySelectorAll(".band")];
+  function slideBands() {
+    if (quiet) return;
+    bandRows.forEach(b => {
+      const r = b.getBoundingClientRect();
+      const off = (r.top - innerHeight / 2) * Number(b.dataset.speed);
+      b.style.transform = "translate3d(" + (off - (Number(b.dataset.speed) > 0 ? b.scrollWidth * 0.35 : 0)).toFixed(1) + "px,0,0)";
+    });
+  }
+  addEventListener("scroll", slideBands, { passive: true });
+  addEventListener("resize", slideBands);
+  slideBands();
+
+  // Contour lines: a few soft blobs of rings that slowly wobble and shift as you scroll.
+  const topo = document.getElementById("topo"), ctx = topo.getContext("2d");
+  const centers = [[0.12, 0.2, 1.0], [0.85, 0.1, 0.8], [0.7, 0.85, 1.2], [0.2, 0.9, 0.7], [0.5, 0.5, 0.9]];
+  let topoT = 0;
+  function drawTopo() {
+    const dpr = Math.min(2, devicePixelRatio || 1), w = innerWidth, h = innerHeight;
+    if (topo.width !== Math.round(w * dpr)) { topo.width = Math.round(w * dpr); topo.height = Math.round(h * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const ink = getComputedStyle(root).getPropertyValue("--ink").trim() || "#111";
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 1.4;
+    const phase = scrollY * 0.003 + topoT;
+    const size = Math.max(w, h);
+    centers.forEach(([cx, cy, k], n) => {
+      const ox = cx * w, oy = cy * h - scrollY * 0.08 * (n % 2 ? 1 : -1);
+      for (let ring = 1; ring <= 9; ring++) {
+        const R = ring * size * 0.035 * k;
+        ctx.globalAlpha = 0.16 - ring * 0.012;
+        ctx.beginPath();
+        for (let a = 0; a <= 64; a++) {
+          const th = a / 64 * Math.PI * 2;
+          const wob = 1 + 0.16 * Math.sin(3 * th + phase + n) + 0.08 * Math.sin(5 * th - phase * 1.4 + ring * 0.3)
+                        + 0.05 * Math.sin(2 * th + phase * 0.7 + ring * 0.5);
+          const x = ox + Math.cos(th) * R * wob, y = oy + Math.sin(th) * R * wob * 0.8;
+          a ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    });
+    ctx.globalAlpha = 1;
+  }
+  addEventListener("scroll", drawTopo, { passive: true });
+  addEventListener("resize", drawTopo);
+  drawTopo();
+  // A slow drift even when you're not scrolling.
+  if (!quiet) setInterval(() => { topoT += 0.01; drawTopo(); }, 60);
+
+  // Pre-order sign-up, all inside the page. On the site's own address the email goes straight to
+  // Ryan's "Day Board pre-order" Google Form in the background. The claude.ai viewer blocks pages
+  // from sending anything out, so there the form says sign-ups aren't open on this link yet.
+  const SIGNUP_POST = "https://docs.google.com/forms/d/e/1FAIpQLSc9mxCGmPmVQ4a3R24xyxq8c_cwNoSegsDfu4uXexuAy-j_Fw/formResponse";
+  const SIGNUP_FIELD = "entry.1503011741";
+  const emailIn = document.getElementById("signupEmail"), go = document.getElementById("signupGo"),
+        note = document.getElementById("signupNote"), form = document.getElementById("signupForm");
+  const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+  const say = (text, kind) => { note.textContent = text; note.className = "signup-note" + (kind ? " " + kind : ""); };
+  emailIn.addEventListener("input", () => { emailIn.removeAttribute("aria-invalid"); say("Your email is only used for Day Board updates."); });
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const v = emailIn.value.trim();
+    if (!validEmail(v)) {
+      emailIn.setAttribute("aria-invalid", "true");
+      say("That email doesn't look right. Check it and try again.", "err");
+      emailIn.focus();
+      return;
+    }
+    go.disabled = true;
+    go.textContent = "Saving…";
+    try {
+      await fetch(SIGNUP_POST, { method: "POST", mode: "no-cors", body: new URLSearchParams({ [SIGNUP_FIELD]: v }) });
+      say("You're on the list. Watch your inbox for launch day.", "ok");
+      emailIn.value = "";
+      go.textContent = "You're in ✓";
+    } catch (err) {
+      say("Sign-ups aren't open on this link yet. They'll open on Day Board's own website soon.", "err");
+      go.textContent = "Reserve my spot";
+      go.disabled = false;
+    }
+  });
+
+  if (quiet) return; // Everything below is motion.
+
+  // Small widget flips between your next class and your next test.
+  const flip = document.getElementById("wflip");
+  const wl = document.getElementById("wlbl"), wt = document.getElementById("wt"), wm = document.getElementById("wm");
+  let alt = false;
+  setInterval(() => {
+    if (!live(5)) return;
+    flip.classList.add("out");
+    setTimeout(() => {
+      alt = !alt;
+      wl.textContent = alt ? "AFTER THAT" : "NEXT";
+      wl.style.color = "#0a84ff";
+      wt.innerHTML = alt ? '<span class="bar b-history" style="height:18px"></span>World History'
+                         : '<span class="bar b-science" style="height:18px"></span>Biology';
+      wm.textContent = alt ? "9:45 AM" : "8:30 AM";
+      flip.classList.remove("out");
+    }, 350);
+  }, 2600);
+})();
+</script>
+
+</body>
+</html>
